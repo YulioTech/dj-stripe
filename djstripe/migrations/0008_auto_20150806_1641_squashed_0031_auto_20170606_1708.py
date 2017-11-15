@@ -1269,9 +1269,9 @@ class Migration(migrations.Migration):
         migrations.RunPython(
             code=sync_transfers,
         ),
-        migrations.RunPython(
-            code=sync_customers,
-        ),
+        # migrations.RunPython(
+        #     code=sync_customers,
+        # ),
         migrations.AlterField(
             model_name='subscription',
             name='stripe_id',

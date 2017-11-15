@@ -21,8 +21,8 @@ class Command(BaseCommand):
     help = "Sync subscriber data with stripe."
 
     def handle(self, *args, **options):
-        """Call sync_subscriber on Subscribers without customers associated to them."""
-        qs = get_subscriber_model().objects.filter(customer__isnull=True)
+        """Call sync_subscriber on all Subscribers."""
+        qs = get_subscriber_model().objects.all()
         count = 0
         total = qs.count()
         for subscriber in qs:
