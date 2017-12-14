@@ -181,10 +181,10 @@ def subscription_status(customer):
 
     If the customer does not have a subscription, an empty string is returned.
     """
-    if customer.subscription:
-        return customer.subscription.status
-    else:
-        return ""
+    return ", ".join([
+        "{plan__name}: {status}".format(**subscription)
+        for subscription in customer.subscriptions.values("plan__name", "status")
+    ])
 
 
 subscription_status.short_description = "Subscription Status"
