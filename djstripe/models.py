@@ -21,7 +21,7 @@ from datetime import timedelta
 import stripe
 from django.core.exceptions import ValidationError
 from django.core.validators import MaxValueValidator, MinValueValidator
-from django.db import models
+from django.db import models, IntegrityError
 from django.db.models.deletion import SET_NULL
 from django.db.models.fields import BooleanField, CharField, DateTimeField, NullBooleanField, TextField, UUIDField
 from django.db.models.fields.related import ForeignKey, OneToOneField
@@ -234,7 +234,7 @@ class StripeObject(models.Model):
         pass
 
     @classmethod
-    def _create_from_stripe_object(cls, data, save=True):
+    def _create_from_stripe_object(cls, data, save=True, force_insert=True):
         """
         Instantiates a model instance using the provided data object received
         from Stripe, and saves it to the database if specified.
@@ -250,7 +250,7 @@ class StripeObject(models.Model):
         instance._attach_objects_hook(cls, data)
 
         if save:
-            instance.save()
+            instance.save(force_insert=force_insert)
 
         instance._attach_objects_post_save_hook(cls, data)
 
@@ -295,7 +295,10 @@ class StripeObject(models.Model):
         # If this happens when syncing Stripe data, it's a djstripe bug. Report it!
         assert not should_expand, "No data to create {} from {}".format(cls.__name__, field_name)
 
-        return cls._create_from_stripe_object(data, save=save), True
+        try:
+            return cls._create_from_stripe_object(data, save=save, force_insert=True), True
+        except IntegrityError:
+            return cls.stripe_objects.get(stripe_id=stripe_id), False
 
     @classmethod
     def _stripe_object_to_customer(cls, target_cls, data):
