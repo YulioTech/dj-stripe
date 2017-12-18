@@ -2682,7 +2682,17 @@ class Subscription(StripeObject):
 
     def _attach_objects_hook(self, cls, data):
         self.customer = cls._stripe_object_to_customer(target_cls=Customer, data=data)
-        self.plan = cls._stripe_object_to_plan(target_cls=Plan, data=data)
+        
+        if "plan" in data and data["plan"]:
+            # single - pass data as is
+            self.plan = cls._stripe_object_to_plan(target_cls=Plan, data=data)
+        else:
+            # multiplan - try to get user plan
+            for item in data["items"]['data']:
+                if item['plan']['metadata']['plan_type'] != 'addon':
+                    self.plan = cls._stripe_object_to_plan(target_cls=Plan, data=item)
+                    self.quantity = 1
+                    break
 
 
 # ============================================================================ #
