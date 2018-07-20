@@ -1664,10 +1664,15 @@ class Card(StripeSource):
 
     def _attach_objects_hook(self, cls, data):
         customer = cls._stripe_object_to_customer(target_cls=Customer, data=data)
-        if customer:
-            self.customer = customer
-        else:
-            raise ValidationError("A customer was not attached to this card.")
+		
+		# this logic will throw exception on manual charge
+        #if customer:
+        #    self.customer = customer
+        #else:
+        #    raise ValidationError("A customer was not attached to this card.")
+		
+		# for manual charge, customer will be none
+		self.customer = customer
 
     def get_stripe_dashboard_url(self):
         return self.customer.get_stripe_dashboard_url()
