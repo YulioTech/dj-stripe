@@ -1446,7 +1446,6 @@ class Event(StripeObject):
                 # if this is manual charge with no customer then we will skip
                 if self.type == 'charge.succeeded' and self.customer is None:
                     self.processed = True
-                    raise exc
                     pass
                 else:
                     # else raise the exception again for upper level to handle
