@@ -1444,22 +1444,13 @@ class Event(StripeObject):
                 self.processed = True
             except ValidationError as exc:
                 # if this is manual charge with no customer then we will skip
-                if exc.message == "A customer was not attached to this card.":
+                if self.type == 'charge.succeeded' and self.customer is None:
                     self.processed = True
+                    raise exc
                     pass
                 else:
-                    exc_value = exc
-                    self.processed = False
-                    EventProcessingException.log(
-                        data=exc.http_body,
-                        exception=exc,
-                        event=self
-                    )
-                    webhook_processing_error.send(
-                        sender=Event,
-                        data=exc.http_body,
-                        exception=exc
-                    )
+                    # else raise the exception again for upper level to handle
+                    raise exc
             except StripeError as exc:
                 # TODO: What if we caught all exceptions or a broader range of exceptions here? How about DoesNotExist
                 # exceptions, for instance? or how about TypeErrors, KeyErrors, ValueErrors, etc?
