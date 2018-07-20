@@ -1442,6 +1442,14 @@ class Event(StripeObject):
                 webhooks.call_handlers(event=self)
                 self._send_signal()
                 self.processed = True
+            except ValidationError as exc:
+                # if this is manual charge with no customer then we will skip
+                if self.type == 'charge.succeeded' and self.customer is None:
+                    self.processed = True
+                    pass
+                else:
+                    # else raise the exception again for upper level to handle
+                    raise exc
             except StripeError as exc:
                 # TODO: What if we caught all exceptions or a broader range of exceptions here? How about DoesNotExist
                 # exceptions, for instance? or how about TypeErrors, KeyErrors, ValueErrors, etc?
@@ -1668,6 +1676,8 @@ class Card(StripeSource):
             self.customer = customer
         else:
             raise ValidationError("A customer was not attached to this card.")
+
+
 
     def get_stripe_dashboard_url(self):
         return self.customer.get_stripe_dashboard_url()
@@ -2682,7 +2692,7 @@ class Subscription(StripeObject):
 
     def _attach_objects_hook(self, cls, data):
         self.customer = cls._stripe_object_to_customer(target_cls=Customer, data=data)
-        
+
         if "plan" in data and data["plan"]:
             # single - pass data as is
             self.plan = cls._stripe_object_to_plan(target_cls=Plan, data=data)
