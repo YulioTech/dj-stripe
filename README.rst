@@ -37,15 +37,15 @@ Features
 * Subscription management
 * Designed for easy implementation of post-registration subscription forms
 * Single-unit purchases
-* Works with Django >= 1.10
+* Works with Django >= 1.11
 * Works with Python 3.6, 3.5, 3.4, 2.7
+* Compatible with Stripe API version 2018-05-21
 * Built-in migrations
 * Dead-Easy installation
 * Leverages the best of the 3rd party Django package ecosystem
 * `djstripe` namespace so you can have more than one payments related app
 * Documented
 * 100% Tested
-* Current API version (2017-06-05), in progress of being updated
 
 Constraints
 ------------
@@ -92,6 +92,8 @@ Add to the urls.py:
 
     url(r'^payments/', include('djstripe.urls', namespace="djstripe")),
 
+Then tell Stripe about the webhook (Stripe webhook docs can be found `here <https://stripe.com/docs/webhooks>`_) using the full URL of your endpoint from the urls.py step above (e.g. ``https://yourwebsite.com/payments/webhook``).
+
 Run the commands::
 
     python manage.py migrate
@@ -105,7 +107,7 @@ Running the Tests
 Assuming the tests are run against PostgreSQL::
 
     createdb djstripe
-    pip install -r tests/requirements.txt
+    pip install tox
     tox
 
 Follows Best Practices

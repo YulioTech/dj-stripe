@@ -14,10 +14,10 @@ from django.contrib.auth import get_user_model
 from django.test.testcases import TestCase
 from mock import patch
 
-from djstripe.enums import SourceType
-from djstripe.models import Account, Charge
+from djstripe.enums import ChargeStatus, LegacySourceType
+from djstripe.models import Account, Charge, Dispute, PaymentMethod
 
-from . import FAKE_ACCOUNT, FAKE_CHARGE, FAKE_CUSTOMER, FAKE_TRANSFER
+from . import FAKE_ACCOUNT, FAKE_CHARGE, FAKE_CUSTOMER, FAKE_TRANSFER, default_account
 
 
 class ChargeTest(TestCase):
@@ -25,11 +25,34 @@ class ChargeTest(TestCase):
     def setUp(self):
         self.user = get_user_model().objects.create_user(username="user", email="user@example.com")
         self.customer = FAKE_CUSTOMER.create_for_user(self.user)
-        self.account = Account.objects.create()
+        self.account = default_account()
 
     def test_str(self):
-        charge = Charge(amount=50, paid=True, stripe_id='charge_xxxxxxxxxxxxxx')
-        self.assertEqual("<amount=50, paid=True, stripe_id=charge_xxxxxxxxxxxxxx>", str(charge))
+        charge = Charge(
+            amount=50, currency="usd", stripe_id="ch_test",
+            status=ChargeStatus.failed,
+            captured=False,
+            paid=False,
+        )
+        self.assertEqual(str(charge), "$50.00 USD (Uncaptured)")
+
+        charge.captured = True
+        self.assertEqual(str(charge), "$50.00 USD (Failed)")
+        charge.status = ChargeStatus.succeeded
+
+        charge.dispute = Dispute()
+        self.assertEqual(str(charge), "$50.00 USD (Disputed)")
+
+        charge.dispute = None
+        charge.refunded = True
+        charge.amount_refunded = 50
+        self.assertEqual(str(charge), "$50.00 USD (Refunded)")
+
+        charge.refunded = False
+        self.assertEqual(str(charge), "$50.00 USD (Partially refunded)")
+
+        charge.amount_refunded = 0
+        self.assertEqual(str(charge), "$50.00 USD")
 
     @patch("djstripe.models.Account.get_default_account")
     @patch("stripe.Charge.retrieve")
@@ -65,7 +88,7 @@ class ChargeTest(TestCase):
         self.assertEqual(0, charge.amount_refunded)
 
         self.assertEqual("card_16YKQh2eZvKYlo2Cblc5Feoo", charge.source_stripe_id)
-        self.assertEqual(charge.source_type, SourceType.card)
+        self.assertEqual(charge.source_type, LegacySourceType.card)
 
     @patch("djstripe.models.Account.get_default_account")
     def test_sync_from_stripe_data_max_amount(self, default_account_mock):
@@ -94,7 +117,7 @@ class ChargeTest(TestCase):
         charge = Charge.sync_from_stripe_data(fake_charge_copy)
         self.assertEqual("test_id", charge.source_stripe_id)
         self.assertEqual("unsupported", charge.source_type)
-        self.assertEqual(None, charge.source)
+        self.assertEqual(charge.source, PaymentMethod.objects.get(id="test_id"))
 
     @patch("djstripe.models.Account.get_default_account")
     def test_sync_from_stripe_data_no_customer(self, default_account_mock):

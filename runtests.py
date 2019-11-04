@@ -11,7 +11,7 @@ from termcolor import colored
 
 
 TESTS_ROOT = os.path.abspath(os.path.dirname(os.path.dirname(__file__)))
-TESTS_THRESHOLD = 100
+TESTS_THRESHOLD = 95
 
 
 def main():
@@ -36,17 +36,22 @@ def run_test_suite(args):
         cov.erase()
         cov.start()
 
+    test_db_name = os.environ.get('DJSTRIPE_TEST_DB_NAME', 'djstripe')
+    test_db_user = os.environ.get('DJSTRIPE_TEST_DB_USER', 'postgres')
+    test_db_pass = os.environ.get('DJSTRIPE_TEST_DB_PASS', '')
+
     settings.configure(
         DEBUG=True,
-        USE_TZ=True,
-        TIME_ZONE="UTC",
+        SECRET_KEY="djstripe",
         SITE_ID=1,
+        TIME_ZONE="UTC",
+        USE_TZ=True,
         DATABASES={
             "default": {
                 "ENGINE": "django.db.backends.postgresql_psycopg2",
-                "NAME": "djstripe",
-                "USER": "postgres",
-                "PASSWORD": "",
+                "NAME": test_db_name,
+                "USER": test_db_user,
+                "PASSWORD": test_db_pass,
                 "HOST": "localhost",
                 "PORT": "",
             },
@@ -158,6 +163,10 @@ def run_test_suite(args):
     # http://stackoverflow.com/a/1718407/1834570
     args = sys.argv[1:]
     sys.argv = sys.argv[0:1]
+
+    # Add the ability to run tests on executable files. This is important when running tests on WSL, where permissions
+    # are dictated by Windows instead of Unix.
+    sys.argv += ["--exe"]
 
     from django_nose import NoseTestSuiteRunner
 

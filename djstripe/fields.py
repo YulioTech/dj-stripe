@@ -24,6 +24,12 @@ else:
     from jsonfield import JSONField
 
 
+class PaymentMethodForeignKey(models.ForeignKey):
+    def __init__(self, **kwargs):
+        kwargs.setdefault("to", "PaymentMethod")
+        super(PaymentMethodForeignKey, self).__init__(**kwargs)
+
+
 class StripeFieldMixin(object):
     """
     Custom fields for all Stripe data.
@@ -154,6 +160,24 @@ class StripeCharField(StripeFieldMixin, models.CharField):
     """A field used to define a CharField value according to djstripe logic."""
 
     pass
+
+
+class StripeEnumField(StripeCharField):
+    def __init__(self, enum, *args, **kwargs):
+        self.enum = enum
+        choices = enum.choices
+        defaults = {
+            "choices": choices,
+            "max_length": max(len(k) for k, v in choices)
+        }
+        defaults.update(kwargs)
+        super(StripeEnumField, self).__init__(*args, **defaults)
+
+    def deconstruct(self):
+        name, path, args, kwargs = super(StripeEnumField, self).deconstruct()
+        kwargs["enum"] = self.enum
+        del kwargs["choices"]
+        return name, path, args, kwargs
 
 
 class StripeIdField(StripeCharField):
