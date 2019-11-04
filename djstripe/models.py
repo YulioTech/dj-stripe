@@ -1481,20 +1481,11 @@ class Event(StripeObject):
         """
         Invokes any webhook handlers that have been registered for this event
         based on event type or event sub-type.
-
         See event handlers registered in the ``djstripe.event_handlers`` module
         (or handlers registered in djstripe plugins or contrib packages).
         """
 
         webhooks.call_handlers(event=self)
-            except ValidationError as exc:
-                # if this is manual charge with no customer then we will skip
-                if self.type == 'charge.succeeded' and self.customer is None:
-                    self.processed = True
-                    pass
-                else:
-                    # else raise the exception again for upper level to handle
-                    raise exc
 
         signal = WEBHOOK_SIGNALS.get(self.type)
         if signal:
