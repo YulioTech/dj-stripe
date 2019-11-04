@@ -12,18 +12,15 @@ from copy import deepcopy
 from django.test.testcases import TestCase
 from mock import patch
 
-from djstripe.models import InvoiceItem
+from djstripe.models import Account, InvoiceItem
 
-from . import (
-    FAKE_CHARGE_II, FAKE_CUSTOMER_II, FAKE_INVOICE_II, FAKE_INVOICEITEM,
-    FAKE_PLAN_II, FAKE_SUBSCRIPTION_III, default_account
-)
+from . import FAKE_CHARGE_II, FAKE_CUSTOMER_II, FAKE_INVOICE_II, FAKE_INVOICEITEM, FAKE_PLAN_II, FAKE_SUBSCRIPTION_III
 
 
 class InvoiceItemTest(TestCase):
 
     def setUp(self):
-        self.account = default_account()
+        self.account = Account.objects.create()
 
     @patch("djstripe.models.Account.get_default_account")
     @patch("stripe.Plan.retrieve", return_value=deepcopy(FAKE_PLAN_II))
@@ -42,13 +39,14 @@ class InvoiceItemTest(TestCase):
 
         self.assertEqual(
             str(invoiceitem),
-            "<amount=20, date=2015-08-08 11:26:56+00:00, stripe_id=ii_16XVTY2eZvKYlo2Cxz5n3RaS>"
+            "Subscription to New plan name ({price})".format(price=invoiceitem.plan.human_readable_price)
         )
         invoiceitem.plan = None
-        self.assertEqual(
-            str(invoiceitem),
-            "<amount=20, date=2015-08-08 11:26:56+00:00, stripe_id=ii_16XVTY2eZvKYlo2Cxz5n3RaS>"
-        )
+        self.assertEqual(str(invoiceitem), "<amount={amount}, date={date}, stripe_id={stripe_id}>".format(
+            amount=invoiceitem.amount,
+            date=invoiceitem.date,
+            stripe_id=invoiceitem_data["id"]
+        ))
 
     @patch("djstripe.models.Account.get_default_account")
     @patch("stripe.Subscription.retrieve", return_value=deepcopy(FAKE_SUBSCRIPTION_III))

@@ -18,7 +18,7 @@ from django.utils.module_loading import import_string
 from .checks import validate_stripe_api_version
 
 
-DEFAULT_STRIPE_API_VERSION = "2018-05-21"
+DEFAULT_STRIPE_API_VERSION = "2017-06-05"
 
 
 def get_callback_function(setting_name, default=None):
@@ -98,27 +98,6 @@ elif STRIPE_LIVE_MODE:
     STRIPE_PUBLIC_KEY = getattr(settings, "STRIPE_LIVE_PUBLIC_KEY", "")
 else:
     STRIPE_PUBLIC_KEY = getattr(settings, "STRIPE_TEST_PUBLIC_KEY", "")
-
-
-# Set STRIPE_API_HOST if you want to use a different Stripe API server
-# Example: https://github.com/stripe/stripe-mock
-if hasattr(settings, "STRIPE_API_HOST"):
-    stripe.api_base = settings.STRIPE_API_HOST
-
-
-def get_default_api_key(livemode):
-    """
-    Returns the default API key for a value of `livemode`.
-    """
-    if livemode is None:
-        # Livemode is unknown. Use the default secret key.
-        return STRIPE_SECRET_KEY
-    elif livemode:
-        # Livemode is true, use the live secret key
-        return LIVE_API_KEY or STRIPE_SECRET_KEY
-    else:
-        # Livemode is false, use the test secret key
-        return TEST_API_KEY or STRIPE_SECRET_KEY
 
 
 SUBSCRIPTION_REDIRECT = getattr(settings, "DJSTRIPE_SUBSCRIPTION_REDIRECT", "djstripe:subscribe")

@@ -21,12 +21,12 @@ from mock import ANY, patch
 from stripe.error import InvalidRequestError
 
 from djstripe.exceptions import MultipleSubscriptionException
-from djstripe.models import Card, Charge, Coupon, Customer, Invoice, PaymentMethod, Plan, Subscription
+from djstripe.models import Account, Card, Charge, Coupon, Customer, Invoice, Plan, Subscription
 
 from . import (
     FAKE_ACCOUNT, FAKE_CARD, FAKE_CARD_V, FAKE_CHARGE, FAKE_COUPON, FAKE_CUSTOMER, FAKE_CUSTOMER_II,
-    FAKE_DISCOUNT_CUSTOMER, FAKE_INVOICE, FAKE_INVOICE_III, FAKE_INVOICEITEM, FAKE_PLAN, FAKE_SUBSCRIPTION,
-    FAKE_SUBSCRIPTION_II, FAKE_UPCOMING_INVOICE, StripeList, datetime_to_unix, default_account
+    FAKE_DISCOUNT_CUSTOMER, FAKE_INVOICE, FAKE_INVOICE_III, FAKE_INVOICEITEM, FAKE_PLAN,
+    FAKE_SUBSCRIPTION, FAKE_SUBSCRIPTION_II, FAKE_UPCOMING_INVOICE, StripeList, datetime_to_unix
 )
 
 
@@ -36,13 +36,12 @@ class TestCustomer(TestCase):
         self.user = get_user_model().objects.create_user(username="pydanny", email="pydanny@gmail.com")
         self.customer = FAKE_CUSTOMER.create_for_user(self.user)
 
-        self.payment_method, _ = PaymentMethod._get_or_create_source(FAKE_CARD, "card")
-        self.card = self.payment_method.resolve()
+        self.card, _created = Card._get_or_create_from_stripe_object(data=FAKE_CARD)
 
-        self.customer.default_source = self.payment_method
+        self.customer.default_source = self.card
         self.customer.save()
 
-        self.account = default_account()
+        self.account = Account.objects.create()
 
     def test_str(self):
         self.assertEqual(str(self.customer), self.user.email)
@@ -50,20 +49,6 @@ class TestCustomer(TestCase):
         self.assertEqual(str(self.customer), self.customer.stripe_id)
         self.customer.subscriber = None
         self.assertEqual(str(self.customer), "{stripe_id} (deleted)".format(stripe_id=self.customer.stripe_id))
-
-    def test_account_balance(self):
-        self.assertEqual(self.customer.account_balance, 0)
-        self.assertEqual(self.customer.credits, 0)
-
-        self.customer.account_balance = 1000
-        self.assertEqual(self.customer.account_balance, 1000)
-        self.assertEqual(self.customer.credits, 0)
-        self.assertEqual(self.customer.pending_charges, 1000)
-
-        self.customer.account_balance = -1000
-        self.assertEqual(self.customer.account_balance, -1000)
-        self.assertEqual(self.customer.credits, 1000)
-        self.assertEqual(self.customer.pending_charges, 0)
 
     def test_customer_dashboard_url(self):
         expected_url = "https://dashboard.stripe.com/test/customers/{}".format(self.customer.stripe_id)
@@ -83,10 +68,7 @@ class TestCustomer(TestCase):
         user = get_user_model().objects.create_user(username="test_user_sync_unsupported_source")
         synced_customer = fake_customer.create_for_user(user)
         self.assertEqual(0, synced_customer.sources.count())
-        self.assertEqual(
-            synced_customer.default_source,
-            PaymentMethod.objects.get(id=fake_customer["default_source"]["id"])
-        )
+        self.assertEqual(None, synced_customer.default_source)
 
     def test_customer_sync_has_subscriber_metadata(self):
         user = get_user_model().objects.create(username="test_metadata", id=12345)

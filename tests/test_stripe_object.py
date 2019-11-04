@@ -23,7 +23,7 @@ SIMPLE_OBJ_RESULT = {
     'description': None,
     'livemode': True,
     'metadata': None,
-    'created': None
+    'stripe_timestamp': None
 }
 
 

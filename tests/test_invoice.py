@@ -14,20 +14,18 @@ from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.test.testcases import TestCase
 from mock import ANY, patch
-from stripe.error import InvalidRequestError
 
-from djstripe.models import Invoice, Plan, Subscription, UpcomingInvoice
+from djstripe.models import Account, InvalidRequestError, Invoice, Plan, Subscription, UpcomingInvoice
 
 from . import (
-    FAKE_CHARGE, FAKE_CUSTOMER, FAKE_INVOICE, FAKE_INVOICEITEM_II,
-    FAKE_PLAN, FAKE_SUBSCRIPTION, FAKE_UPCOMING_INVOICE, default_account
+    FAKE_CHARGE, FAKE_CUSTOMER, FAKE_INVOICE, FAKE_INVOICEITEM_II, FAKE_PLAN, FAKE_SUBSCRIPTION, FAKE_UPCOMING_INVOICE
 )
 
 
 class InvoiceTest(TestCase):
 
     def setUp(self):
-        self.account = default_account()
+        self.account = Account.objects.create()
         self.user = get_user_model().objects.create_user(username="pydanny", email="pydanny@gmail.com")
         self.customer = FAKE_CUSTOMER.create_for_user(self.user)
 
@@ -38,7 +36,16 @@ class InvoiceTest(TestCase):
         default_account_mock.return_value = self.account
         invoice = Invoice.sync_from_stripe_data(deepcopy(FAKE_INVOICE))
         self.assertEqual(invoice.get_stripe_dashboard_url(), self.customer.get_stripe_dashboard_url())
-        self.assertEqual(str(invoice), "Invoice #XXXXXXX-0001")
+
+        self.assertEqual(
+            "<amount_due={amount_due}, date={date}, status={status}, stripe_id={stripe_id}>".format(
+                amount_due=invoice.amount_due,
+                date=invoice.date,
+                status=invoice.status,
+                stripe_id=invoice.stripe_id
+            ),
+            str(invoice)
+        )
 
     @patch("stripe.Invoice.retrieve")
     @patch("djstripe.models.Account.get_default_account")

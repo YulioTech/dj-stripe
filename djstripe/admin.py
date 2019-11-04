@@ -12,7 +12,10 @@ from __future__ import absolute_import, division, print_function, unicode_litera
 
 from django.contrib import admin
 
-from . import models
+from .models import (
+    Charge, Coupon, Customer, Event, EventProcessingException,
+    IdempotencyKey, Invoice, InvoiceItem, Plan, Subscription, Transfer
+)
 
 
 class BaseHasSourceListFilter(admin.SimpleListFilter):
@@ -74,7 +77,7 @@ class CustomerSubscriptionStatusListFilter(admin.SimpleListFilter):
         """
         statuses = [
             [x, x.replace("_", " ").title()]
-            for x in models.Subscription.objects.values_list(
+            for x in Subscription.objects.values_list(
                 "status",
                 flat=True
             ).distinct()
@@ -94,28 +97,21 @@ class CustomerSubscriptionStatusListFilter(admin.SimpleListFilter):
             return queryset.filter(subscriptions__status=self.value()).distinct()
 
 
-@admin.register(models.IdempotencyKey)
+@admin.register(IdempotencyKey)
 class IdempotencyKeyAdmin(admin.ModelAdmin):
     list_display = ("uuid", "action", "created", "is_expired", "livemode")
     list_filter = ("livemode", )
     search_fields = ("uuid", "action")
 
 
-@admin.register(models.WebhookEventTrigger)
-class WebhookEventTriggerAdmin(admin.ModelAdmin):
-    list_display = (
-        "created", "event", "remote_ip", "processed", "valid", "exception", "djstripe_version"
-    )
-    list_filter = ("created", "valid", "processed")
+@admin.register(EventProcessingException)
+class EventProcessingExceptionAdmin(admin.ModelAdmin):
+    list_display = ("message", "event", "created")
     raw_id_fields = ("event", )
+    search_fields = ("message", "traceback", "data")
 
-    def reprocess(self, request, queryset):
-        for trigger in queryset:
-            if not trigger.valid:
-                self.message_user(request, "Skipped invalid trigger {}".format(trigger))
-                continue
-
-            trigger.process()
+    def has_add_permission(self, request):
+        return False
 
 
 class StripeObjectAdmin(admin.ModelAdmin):
@@ -124,19 +120,19 @@ class StripeObjectAdmin(admin.ModelAdmin):
     change_form_template = "djstripe/admin/change_form.html"
 
     def get_list_display(self, request):
-        return ("stripe_id", ) + self.list_display + ("created", "livemode")
+        return ("stripe_id", ) + self.list_display + ("stripe_timestamp", "livemode")
 
     def get_list_filter(self, request):
-        return self.list_filter + ("created", "livemode")
+        return self.list_filter + ("stripe_timestamp", "livemode")
 
     def get_readonly_fields(self, request, obj=None):
-        return self.readonly_fields + ("stripe_id", "created")
+        return self.readonly_fields + ("stripe_id", "stripe_timestamp")
 
     def get_search_fields(self, request):
         return self.search_fields + ("stripe_id", )
 
     def get_fieldsets(self, request, obj=None):
-        common_fields = ("livemode", "stripe_id", "created")
+        common_fields = ("livemode", "stripe_id", "stripe_timestamp")
         # Have to remove the fields from the common set, otherwise they'll show up twice.
         fields = [f for f in self.get_fields(request, obj) if f not in common_fields]
         return (
@@ -145,21 +141,70 @@ class StripeObjectAdmin(admin.ModelAdmin):
         )
 
 
+def reprocess_events(modeladmin, request, queryset):
+    """Re-process the selected webhook events.
+
+    Note that this isn't idempotent, so any side-effects that are produced from
+    the event being handled will be multiplied (for example, an event handler
+    that sends emails will send duplicates; an event handler that adds 1 to a
+    total count will be a count higher than it was, etc.)
+
+    There aren't any event handlers with adverse side-effects built within
+    dj-stripe, but there might be within your own event handlers, third-party
+    plugins, contrib code, etc.
+    """
+    processed = 0
+    for event in queryset:
+        if event.process(force=True):
+            processed += 1
+
+    message = "{processed}/{total} event(s) successfully re-processed."
+    total = queryset.count()
+    modeladmin.message_user(request, message.format(processed=processed, total=total))
+
+
+reprocess_events.short_description = "Re-process selected webhook events"
+
+
 class SubscriptionInline(admin.StackedInline):
     """A TabularInline for use models.Subscription."""
 
-    model = models.Subscription
+    model = Subscription
     extra = 0
-    readonly_fields = ("stripe_id", "created")
+    readonly_fields = ("stripe_id", "stripe_timestamp")
     show_change_link = True
+
+
+def subscription_status(customer):
+    """
+    Return a string representation of the customer's subscription status.
+
+    If the customer does not have a subscription, an empty string is returned.
+    """
+    return ", ".join([
+        "{plan__name}: {status}".format(**subscription)
+        for subscription in customer.subscriptions.values("plan__name", "status")
+    ])
+
+
+subscription_status.short_description = "Subscription Status"
+
+
+def cancel_subscription(modeladmin, request, queryset):
+    """Cancel a subscription."""
+    for subscription in queryset:
+        subscription.cancel()
+
+
+cancel_subscription.short_description = "Cancel selected subscriptions"
 
 
 class InvoiceItemInline(admin.StackedInline):
     """A TabularInline for use InvoiceItem."""
 
-    model = models.InvoiceItem
+    model = InvoiceItem
     extra = 0
-    readonly_fields = ("stripe_id", "created")
+    readonly_fileds = ("stripe_id", "stripe_timestamp")
     raw_id_fields = ("customer", "subscription")
     show_change_link = True
 
@@ -183,28 +228,20 @@ def customer_email(obj):
 customer_email.short_description = "Customer"
 
 
-@admin.register(models.Account)
-class AccountAdmin(StripeObjectAdmin):
-    list_display = ("business_url", "country", "default_currency")
-    list_filter = ("details_submitted", )
-    search_fields = ("business_name", "display_name", "business_url")
-    raw_id_fields = ("business_logo", )
-
-
-@admin.register(models.Charge)
+@admin.register(Charge)
 class ChargeAdmin(StripeObjectAdmin):
     list_display = (
         "customer", "amount", "description", "paid", "disputed", "refunded",
         "fee", "receipt_sent"
     )
-    search_fields = ("customer__stripe_id", "invoice__stripe_id")
+    search_fields = ("stripe_id", "customer__stripe_id", "invoice__stripe_id")
     list_filter = (
-        "status", "source_type", "paid", "refunded", "fraudulent", "captured",
+        "status", "source_type", "paid", "disputed", "refunded", "fraudulent", "captured",
     )
-    raw_id_fields = ("customer", "dispute", "invoice", "source", "transfer")
+    raw_id_fields = ("customer", "invoice", "source", "transfer")
 
 
-@admin.register(models.Coupon)
+@admin.register(Coupon)
 class CouponAdmin(StripeObjectAdmin):
     list_display = (
         "amount_off", "percent_off", "duration", "duration_in_months",
@@ -214,42 +251,27 @@ class CouponAdmin(StripeObjectAdmin):
     radio_fields = {"duration": admin.HORIZONTAL}
 
 
-@admin.register(models.Customer)
+@admin.register(Customer)
 class CustomerAdmin(StripeObjectAdmin):
     raw_id_fields = ("subscriber", "default_source", "coupon")
-    list_display = (
-        "subscriber", "email", "currency", "default_source", "coupon",
-        "account_balance", "business_vat_id",
-    )
+    list_display = ("subscriber", subscription_status)
     list_filter = (CustomerHasSourceListFilter, CustomerSubscriptionStatusListFilter)
-    search_fields = ("email", "description")
     inlines = (SubscriptionInline, )
 
 
-@admin.register(models.Dispute)
-class DisputeAdmin(StripeObjectAdmin):
-    list_display = ("reason", "status", "amount", "currency", "is_charge_refundable")
-    list_filter = ("is_charge_refundable", "reason", "status")
-
-
-@admin.register(models.Event)
+@admin.register(Event)
 class EventAdmin(StripeObjectAdmin):
-    list_display = ("type", "created", "request_id")
-    list_filter = ("type", "created")
-    search_fields = ("request_id", )
+    raw_id_fields = ("customer", )
+    list_display = ("type", "created", "valid", "processed")
+    list_filter = ("type", "created", "valid", "processed")
+    actions = (reprocess_events, )
+    # radio_fields = {"valid": admin.HORIZONTAL}
 
     def has_add_permission(self, request):
         return False
 
 
-@admin.register(models.FileUpload)
-class FileUploadAdmin(StripeObjectAdmin):
-    list_display = ("purpose", "size", "type")
-    list_filter = ("purpose", "type")
-    search_fields = ("filename", )
-
-
-@admin.register(models.Invoice)
+@admin.register(Invoice)
 class InvoiceAdmin(StripeObjectAdmin):
     list_display = (
         "paid", "forgiven", "closed", customer_email, customer_has_source,
@@ -264,7 +286,7 @@ class InvoiceAdmin(StripeObjectAdmin):
     inlines = (InvoiceItemInline, )
 
 
-@admin.register(models.Plan)
+@admin.register(Plan)
 class PlanAdmin(StripeObjectAdmin):
     radio_fields = {"interval": admin.HORIZONTAL}
 
@@ -273,7 +295,7 @@ class PlanAdmin(StripeObjectAdmin):
         if change:
             obj.update_name()
         else:
-            models.Plan.get_or_create(**form.cleaned_data)
+            Plan.get_or_create(**form.cleaned_data)
 
     def get_readonly_fields(self, request, obj=None):
         """Return extra readonly_fields."""
@@ -287,42 +309,14 @@ class PlanAdmin(StripeObjectAdmin):
         return readonly_fields
 
 
-@admin.register(models.Product)
-class ProductAdmin(StripeObjectAdmin):
-    list_display = ("name", "type", "active", "url", "statement_descriptor")
-    list_filter = ("type", "active", "shippable")
-    search_fields = ("name", "statement_descriptor")
-
-
-@admin.register(models.Refund)
-class RefundAdmin(StripeObjectAdmin):
-    list_display = ("amount", "currency", "charge", "reason", "status", "failure_reason")
-    list_filter = ("reason", "status")
-    search_fields = ("receipt_number", )
-
-
-@admin.register(models.Source)
-class SourceAdmin(StripeObjectAdmin):
-    raw_id_fields = ("customer", )
-    list_display = ("customer", "type", "status", "amount", "currency", "usage", "flow")
-    list_filter = ("type", "status", "usage", "flow")
-
-
-@admin.register(models.Subscription)
+@admin.register(Subscription)
 class SubscriptionAdmin(StripeObjectAdmin):
     raw_id_fields = ("customer", )
     list_display = ("customer", "status")
     list_filter = ("status", "cancel_at_period_end")
-
-    def cancel_subscription(self, request, queryset):
-        """Cancel a subscription."""
-        for subscription in queryset:
-            subscription.cancel()
-    cancel_subscription.short_description = "Cancel selected subscriptions"
-
     actions = (cancel_subscription, )
 
 
-@admin.register(models.Transfer)
+@admin.register(Transfer)
 class TransferAdmin(StripeObjectAdmin):
     list_display = ("amount", "status", "date", "description")

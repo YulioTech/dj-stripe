@@ -39,11 +39,13 @@ class TransferTest(TestCase):
 
         # Create transfer
         created_event = Event.sync_from_stripe_data(fake_event_created)
-        created_event.invoke_webhook_handlers()
+        created_event.validate()
+        created_event.process()
 
         # Signal a transfer update
         updated_event = Event.sync_from_stripe_data(fake_event_updated)
-        updated_event.invoke_webhook_handlers()
+        updated_event.validate()
+        updated_event.process()
 
         transfer_instance = Transfer.objects.get(status="fish")
         self.assertEqual(2, transfer_retrieve_mock.call_count)

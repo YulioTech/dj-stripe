@@ -45,13 +45,6 @@ class StripeList(dict):
         return len(self.data)
 
 
-def default_account():
-    from djstripe.models import Account
-    return Account.objects.create(
-        charges_enabled=True, details_submitted=True, payouts_enabled=True
-    )
-
-
 FAKE_BALANCE_TRANSACTION = {
     "id": "txn_16YKQi2eZvKYlo2CNx26h2Wz",
     "object": "balance_transaction",
@@ -461,58 +454,6 @@ FAKE_COUPON = {
 }
 
 
-FAKE_DISPUTE = {
-    "id": "dp_XXXXXXXXXXXXXXXXXXXXXXXX",
-    "object": "dispute",
-    "amount": 499,
-    "balance_transaction": FAKE_BALANCE_TRANSACTION_III["id"],
-    "balance_transactions": [deepcopy(FAKE_BALANCE_TRANSACTION_III)],
-    "charge": FAKE_CHARGE["id"],
-    "created": 1515012086,
-    "currency": "usd",
-    "evidence": {
-      "access_activity_log": None,
-      "billing_address": None,
-      "cancellation_policy": None,
-      "cancellation_policy_disclosure": None,
-      "cancellation_rebuttal": None,
-      "customer_communication": None,
-      "customer_email_address": "customer@example.com",
-      "customer_name": "customer@example.com",
-      "customer_purchase_ip": "127.0.0.1",
-      "customer_signature": None,
-      "duplicate_charge_documentation": None,
-      "duplicate_charge_explanation": None,
-      "duplicate_charge_id": None,
-      "product_description": None,
-      "receipt": "file_XXXXXXXXXXXXXXXXXXXXXXXX",
-      "refund_policy": None,
-      "refund_policy_disclosure": None,
-      "refund_refusal_explanation": None,
-      "service_date": None,
-      "service_documentation": None,
-      "shipping_address": None,
-      "shipping_carrier": None,
-      "shipping_date": None,
-      "shipping_documentation": None,
-      "shipping_tracking_number": None,
-      "uncategorized_file": None,
-      "uncategorized_text": None,
-    },
-    "evidence_details": {
-      "due_by": 1516406399,
-      "has_evidence": False,
-      "past_due": False,
-      "submission_count": 0,
-    },
-    "is_charge_refundable": False,
-    "livemode": True,
-    "metadata": {},
-    "reason": "subscription_canceled",
-    "status": "needs_response",
-}
-
-
 FAKE_PLAN = {
     "id": "gold21323",
     "object": "plan",
@@ -526,7 +467,6 @@ FAKE_PLAN = {
     "name": "New plan name",
     "statement_descriptor": None,
     "trial_period_days": None,
-    "usage_type": "licensed",
 }
 
 FAKE_PLAN_II = {
@@ -542,7 +482,6 @@ FAKE_PLAN_II = {
     "name": "New plan name",
     "statement_descriptor": None,
     "trial_period_days": 12,
-    "usage_type": "licensed",
 }
 
 
@@ -566,7 +505,7 @@ class SubscriptionDict(dict):
 
         return self
 
-    def save(self, idempotency_key=None):
+    def save(self):
         return self
 
 
@@ -574,7 +513,6 @@ FAKE_SUBSCRIPTION = SubscriptionDict({
     "id": "sub_6lsC8pt7IcFpjA",
     "object": "subscription",
     "application_fee_percent": None,
-    "billing": "charge_automatically",
     "cancel_at_period_end": False,
     "canceled_at": None,
     "current_period_end": 1441907581,
@@ -604,7 +542,6 @@ FAKE_SUBSCRIPTION_II = SubscriptionDict({
     "id": "sub_6mkwMbhaZF9jih",
     "object": "subscription",
     "application_fee_percent": None,
-    "billing": "charge_automatically",
     "cancel_at_period_end": False,
     "canceled_at": None,
     "current_period_end": 1442111228,
@@ -626,7 +563,6 @@ FAKE_SUBSCRIPTION_III = SubscriptionDict({
     "id": "sub_8NDptncNY485qZ",
     "object": "subscription",
     "application_fee_percent": None,
-    "billing": "charge_automatically",
     "cancel_at_period_end": False,
     "canceled_at": None,
     "current_period_end": 1464821382,
@@ -665,7 +601,7 @@ class Sources(object):
 
 
 class CustomerDict(dict):
-    def save(self, idempotency_key=None):
+    def save(self):
         return self
 
     def delete(self):
@@ -764,12 +700,9 @@ FAKE_INVOICE = InvoiceDict({
     "id": "in_16YHls2eZvKYlo2CwwH968Mc",
     "object": "invoice",
     "amount_due": 2000,
-    "amount_paid": 2000,
-    "amount_remaining": 0,
     "application_fee": None,
     "attempt_count": 1,
     "attempted": True,
-    "billing": "charge_automatically",
     "charge": FAKE_CHARGE["id"],
     "closed": True,
     "currency": "usd",
@@ -777,7 +710,6 @@ FAKE_INVOICE = InvoiceDict({
     "date": 1439218864,
     "description": None,
     "discount": None,
-    "due_date": None,
     "ending_balance": 0,
     "forgiven": False,
     "lines": {
@@ -809,7 +741,6 @@ FAKE_INVOICE = InvoiceDict({
     "livemode": False,
     "metadata": {},
     "next_payment_attempt": None,
-    "number": "XXXXXXX-0001",
     "paid": True,
     "period_end": 1439218689,
     "period_start": 1439132289,
@@ -828,12 +759,9 @@ FAKE_INVOICE_II = InvoiceDict({
     "id": "in_16af5A2eZvKYlo2CJjANLL81",
     "object": "invoice",
     "amount_due": 3000,
-    "amount_paid": 0,
-    "amount_remaining": 3000,
     "application_fee": None,
     "attempt_count": 1,
     "attempted": True,
-    "billing": "charge_automatically",
     "charge": FAKE_CHARGE_II["id"],
     "closed": False,
     "currency": "usd",
@@ -841,7 +769,6 @@ FAKE_INVOICE_II = InvoiceDict({
     "date": 1439785128,
     "description": None,
     "discount": None,
-    "due_date": None,
     "ending_balance": 0,
     "forgiven": False,
     "lines": {
@@ -873,7 +800,6 @@ FAKE_INVOICE_II = InvoiceDict({
     "livemode": False,
     "metadata": {},
     "next_payment_attempt": 1440048103,
-    "number": "XXXXXXX-0002",
     "paid": False,
     "period_end": 1439784771,
     "period_start": 1439698371,
@@ -893,12 +819,9 @@ FAKE_INVOICE_III = InvoiceDict({
     "id": "in_16Z9dP2eZvKYlo2CgFHgFx2Z",
     "object": "invoice",
     "amount_due": 0,
-    "amount_paid": 0,
-    "amount_remaining": 0,
     "application_fee": None,
     "attempt_count": 0,
     "attempted": True,
-    "billing": "charge_automatically",
     "charge": None,
     "closed": False,
     "currency": "usd",
@@ -906,7 +829,6 @@ FAKE_INVOICE_III = InvoiceDict({
     "date": 1439425915,
     "description": None,
     "discount": None,
-    "due_date": None,
     "ending_balance": 20,
     "forgiven": False,
     "lines": {
@@ -938,7 +860,6 @@ FAKE_INVOICE_III = InvoiceDict({
     "livemode": False,
     "metadata": {},
     "next_payment_attempt": None,
-    "number": "XXXXXXX-0003",
     "paid": False,
     "period_end": 1439424571,
     "period_start": 1436746171,
@@ -957,12 +878,9 @@ FAKE_UPCOMING_INVOICE = InvoiceDict({
     "id": "in",
     "object": "invoice",
     "amount_due": 2000,
-    "amount_paid": 0,
-    "amount_remaining": 2000,
     "application_fee": None,
     "attempt_count": 1,
     "attempted": False,
-    "billing": "charge_automatically",
     "charge": None,
     "closed": False,
     "currency": "usd",
@@ -970,7 +888,6 @@ FAKE_UPCOMING_INVOICE = InvoiceDict({
     "date": 1439218864,
     "description": None,
     "discount": None,
-    "due_date": None,
     "ending_balance": None,
     "forgiven": False,
     "lines": {
@@ -1002,7 +919,6 @@ FAKE_UPCOMING_INVOICE = InvoiceDict({
     "livemode": False,
     "metadata": {},
     "next_payment_attempt": 1439218689,
-    "number": None,
     "paid": False,
     "period_end": 1439218689,
     "period_start": 1439132289,
@@ -1097,6 +1013,7 @@ FAKE_TRANSFER = {
     "source_type": "bank_account",
     "statement_descriptor": None,
     "status": "paid",
+    "type": "stripe_account",
 }
 
 FAKE_TRANSFER_II = {
@@ -1173,22 +1090,75 @@ FAKE_ACCOUNT = {
     "id": "acct_1032D82eZvKYlo2C",
     "object": "account",
     "business_logo": None,
-    "business_name": "dj-stripe",
-    "business_primary_color": "#092e20",
-    "business_url": "https://example.com",
-    "charges_enabled": True,
+    "business_name": "Stripe.com",
+    "business_url": None,
+    "charges_enabled": False,
     "country": "US",
+    "debit_negative_balances": True,
+    "decline_charge_on": {
+        "cvc_failure": False,
+        "avs_failure": False,
+    },
     "default_currency": "usd",
-    "details_submitted": True,
-    "display_name": "dj-stripe",
-    "email": "djstripe@example.com",
-    "payouts_enabled": True,
-    "statement_descriptor": "DJSTRIPE",
-    "support_email": "djstripe@exmaple.com",
-    "support_phone": "",
-    "support_url": "https://example.com/support/",
-    "timezone": "Etc/UTC",
-    "type": "standard",
+    "details_submitted": False,
+    "display_name": "Stripe.com",
+    "email": "site@stripe.com",
+    "external_accounts": {
+        "object": "list",
+        "data": [],
+        "has_more": False,
+        "total_count": 0,
+        "url": "/v1/accounts/acct_1032D82eZvKYlo2C/external_accounts",
+    },
+    "legal_entity": {
+        "address": {
+            "city": None,
+            "country": "US",
+            "line1": None,
+            "line2": None,
+            "postal_code": None,
+            "state": None,
+        },
+        "business_name": None,
+        "business_tax_id_provided": False,
+        "dob": {
+            "day": None,
+            "month": None,
+            "year": None
+        },
+        "first_name": None,
+        "last_name": None,
+        "personal_id_number_provided": False,
+        "ssn_last_4_provided": False,
+        "type": None,
+        "verification": {
+            "details": None,
+            "details_code": "failed_other",
+            "document": None,
+            "status": "unverified",
+        },
+    },
+    "managed": False,
+    "product_description": None,
+    "statement_descriptor": None,
+    "support_emaile": None,
+    "support_phone": None,
+    "timezone": "US/Pacific",
+    "tos_acceptance": {
+        "date": None,
+        "ip": None,
+        "user_agent": None
+    },
+    "transfer_schedule": {
+        "delay_days": 7,
+        "interval": "daily"
+    },
+    "transfers_enabled": False,
+    "verification": {
+        "disabled_reason": "other",
+        "fields_needed": [],
+        "due_by": None,
+    },
 }
 
 FAKE_EVENT_ACCOUNT_APPLICATION_DEAUTHORIZED = {
@@ -1337,20 +1307,6 @@ FAKE_EVENT_CUSTOMER_SUBSCRIPTION_DELETED = deepcopy(FAKE_EVENT_CUSTOMER_SUBSCRIP
 FAKE_EVENT_CUSTOMER_SUBSCRIPTION_DELETED.update({
     "id": "evt_38DHch3wHD2eZvKYlCT2oeryaf",
     "type": "customer.subscription.deleted"})
-
-FAKE_EVENT_DISPUTE_CREATED = {
-    "id": "evt_16YKQi2eZvKYlo2CT2oe5ff3",
-    "object": "dispute",
-    "api_version": "2017-08-15",
-    "created": 1439229084,
-    "data": {
-        "object": deepcopy(FAKE_DISPUTE)
-    },
-    "livemode": False,
-    "pending_webhooks": 0,
-    "request": "req_6lsB7hkicwhaDj",
-    "type": "charge.dispute.created",
-}
 
 FAKE_EVENT_INVOICE_CREATED = {
     "id": "evt_187IHD2eZvKYlo2C6YKQi2eZ",
