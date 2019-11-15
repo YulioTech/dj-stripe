@@ -366,8 +366,8 @@ class StripeObject(models.Model):
         assert not should_expand, "No data to create {} from {}".format(cls.__name__, field_name)
 
         try:
-			with transaction.atomic():
-				return cls._create_from_stripe_object(data, save=save), True
+            with transaction.atomic():
+                return cls._create_from_stripe_object(data, save=save), True
         except IntegrityError:
             return cls.stripe_objects.get(stripe_id=stripe_id), False
 
